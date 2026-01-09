@@ -1,31 +1,35 @@
-# Multi-stage build for multi-agent-support-ai
-
-# Build stage
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copy pom.xml first for better caching
+# Copy pom.xml first for better dependency caching
 COPY pom.xml .
 RUN mvn dependency:go-offline -B
 
-# Copy source code
+# Copy source code and docs
 COPY src ./src
+COPY docs ./docs
 
 # Build the application
 RUN mvn clean package -DskipTests
 
+############################
 # Runtime stage
-FROM eclipse-temurin:17-jre-alpine
+############################
+FROM eclipse-temurin:17-jre
 WORKDIR /app
 
-# Copy the built JAR
+# Copy application JAR
 COPY --from=build /app/target/*.jar app.jar
 
-# Expose port
+# Copy docs for TechAgent retrieval
+COPY --from=build /app/docs ./docs
+
+# Expose application port
 EXPOSE 8080
 
-# Set environment variables (can be overridden)
+# Environment variables (can be overridden at runtime)
 ENV OPENAI_MODEL=gpt-4o-mini
+ENV DOCS_PATH=/app/docs
 
 # Run the application
 ENTRYPOINT ["java", "-jar", "app.jar"]
